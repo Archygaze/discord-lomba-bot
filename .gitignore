@@ -11,6 +11,8 @@ __pycache__/
 
 # Environment variables & secrets (NEVER commit this!)
 .env
+.ig_session_*
+*.session
 
 # IDE / OS files
 .vscode/

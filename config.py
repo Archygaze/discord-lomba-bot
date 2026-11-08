@@ -63,8 +63,11 @@ KEYWORDS = [k.strip().lower() for k in RAW_KEYWORDS.split(",") if k.strip()]
 ENABLE_KEYWORD_FILTER = os.getenv("ENABLE_KEYWORD_FILTER", "true").lower() in ("1", "true", "yes")
 
 # Instaloader credentials (optional; leave blank for anonymous / mock / RSS)
-IG_USERNAME = os.getenv("IG_USERNAME", "")
-IG_PASSWORD = os.getenv("IG_PASSWORD", "")
+raw_ig_user = os.getenv("IG_USERNAME", "").strip()
+if "instagram.com/" in raw_ig_user:
+    raw_ig_user = raw_ig_user.split("instagram.com/")[-1].split("/")[0].split("?")[0]
+IG_USERNAME = raw_ig_user.lstrip("@").strip()
+IG_PASSWORD = os.getenv("IG_PASSWORD", "").strip()
 
 # Mock Mode (useful for testing embeds and pings immediately without real IG connection)
 ENABLE_MOCK_DATA = os.getenv("ENABLE_MOCK_DATA", "false").lower() in ("1", "true", "yes")

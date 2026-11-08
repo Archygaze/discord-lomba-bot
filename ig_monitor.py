@@ -203,19 +203,16 @@ def fetch_from_rss(feed_url: str, account_name: str) -> List[Dict[str, Any]]:
 
     return posts
 
-def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[str, Any]]:
-    """
-    Fetches latest posts using Instaloader.
-    NOTE: Instagram strictly rate-limits or blocks anonymous scraping.
-    """
+_L_INSTANCE = None
+
+def get_instaloader_instance() -> Optional[Any]:
+    """Provides a singleton Instaloader instance with session reuse."""
+    global _L_INSTANCE
+    if _L_INSTANCE is not None:
+        return _L_INSTANCE
+
     try:
         import instaloader
-    except ImportError:
-        logger.warning("instaloader is not installed. Run `pip install instaloader`.")
-        return []
-
-    posts = []
-    try:
         L = instaloader.Instaloader(
             download_pictures=False,
             download_videos=False,
@@ -225,12 +222,36 @@ def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[s
         )
 
         if config.IG_USERNAME and config.IG_PASSWORD:
+            session_file = f".ig_session_{config.IG_USERNAME}"
             try:
-                L.login(config.IG_USERNAME, config.IG_PASSWORD)
-                logger.info(f"Successfully logged into Instagram as {config.IG_USERNAME}")
-            except Exception as login_err:
-                logger.error(f"Failed to log in to Instagram: {login_err}")
+                L.load_session_from_file(config.IG_USERNAME, filename=session_file)
+                logger.info(f"Loaded existing Instagram session for {config.IG_USERNAME}")
+            except Exception:
+                try:
+                    L.login(config.IG_USERNAME, config.IG_PASSWORD)
+                    L.save_session_to_file(filename=session_file)
+                    logger.info(f"Successfully logged into Instagram as {config.IG_USERNAME} and saved session")
+                except Exception as login_err:
+                    logger.error(f"Failed to log in to Instagram: {login_err}")
 
+        _L_INSTANCE = L
+        return _L_INSTANCE
+    except Exception as e:
+        logger.warning(f"Instaloader initialization error: {e}")
+        return None
+
+def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[str, Any]]:
+    """
+    Fetches latest posts using Instaloader.
+    Supports authenticated scraping from target campus accounts.
+    """
+    L = get_instaloader_instance()
+    if not L:
+        return []
+
+    posts = []
+    try:
+        import instaloader
         profile = instaloader.Profile.from_username(L.context, account_name)
         count = 0
         for post in profile.get_posts():
@@ -240,7 +261,7 @@ def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[s
             caption = post.caption or ""
             posts.append({
                 "id": post.shortcode,
-                "account": account_name,
+                "account": f"@{account_name}",
                 "title": f"Postingan @{account_name}",
                 "caption": caption,
                 "url": f"https://www.instagram.com/p/{post.shortcode}/",
@@ -250,7 +271,7 @@ def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[s
             })
             count += 1
     except Exception as e:
-        logger.debug(f"Could not fetch from Instagram @{account_name} anonymously: {e}")
+        logger.debug(f"Could not fetch from Instagram @{account_name}: {e}")
     
     return posts
 
