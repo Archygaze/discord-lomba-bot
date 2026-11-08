@@ -57,6 +57,58 @@ def check_keywords(text: str) -> List[str]:
             matches.append(kw)
     return matches
 
+def fetch_from_tech_rss(feed_url: str, source_name: str = "Info Lomba IT") -> List[Dict[str, Any]]:
+    """Fetches Indonesian campus tech competition posts from dedicated RSS feeds."""
+    try:
+        import feedparser
+    except ImportError:
+        logger.warning("feedparser is not installed.")
+        return []
+
+    posts = []
+    try:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries:
+            post_id = getattr(entry, "id", getattr(entry, "link", None))
+            if not post_id:
+                continue
+
+            title = getattr(entry, "title", "Info Lomba IT & Hackathon")
+            raw_summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
+
+            # Extract high-res poster image URL if available
+            image_url = None
+            imgs = re.findall(r'<img[^>]+src=[\x22\x27]([^\x22\x27]+)[\x22\x27]', raw_summary)
+            if imgs:
+                image_url = imgs[0]
+            elif hasattr(entry, "media_content") and entry.media_content:
+                image_url = entry.media_content[0].get("url")
+            elif hasattr(entry, "enclosures") and entry.enclosures:
+                image_url = entry.enclosures[0].get("href")
+
+            # Clean HTML tags to form caption
+            clean_summary = re.sub(r'<[^>]+>', ' ', raw_summary)
+            clean_summary = ' '.join(clean_summary.split()).strip()
+
+            # Collect category tags
+            tags = [t.term.lower() for t in getattr(entry, "tags", []) if hasattr(t, "term")]
+            combined_text = f"{title} {clean_summary} {' '.join(tags)}"
+
+            posts.append({
+                "id": post_id,
+                "account": source_name,
+                "title": title,
+                "caption": clean_summary,
+                "url": getattr(entry, "link", ""),
+                "image_url": image_url,
+                "combined_text": combined_text,
+                "published_at": getattr(entry, "published", datetime.utcnow().isoformat())
+            })
+    except Exception as e:
+        logger.error(f"Error fetching tech RSS from {feed_url}: {e}")
+
+    return posts
+
 def fetch_from_rss(feed_url: str, account_name: str) -> List[Dict[str, Any]]:
     """Fetches posts from an RSS/Atom bridge (like RSSHub or RSS.app)."""
     try:
@@ -65,38 +117,48 @@ def fetch_from_rss(feed_url: str, account_name: str) -> List[Dict[str, Any]]:
         logger.warning("feedparser is not installed. Run `pip install feedparser` to enable RSS mode.")
         return []
 
-    feed = feedparser.parse(feed_url)
     posts = []
-    for entry in feed.entries:
-        post_id = getattr(entry, "id", entry.link)
-        title = getattr(entry, "title", "Postingan Baru")
-        summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
-        # Clean HTML tags from summary for caption
-        clean_caption = re.sub(r"<[^>]+>", "", summary).strip()
-        
-        # Try to find image url from media_content or enclosures
-        image_url = None
-        if hasattr(entry, "media_content") and entry.media_content:
-            image_url = entry.media_content[0].get("url")
-        elif hasattr(entry, "enclosures") and entry.enclosures:
-            image_url = entry.enclosures[0].get("href")
+    try:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries:
+            post_id = getattr(entry, "id", entry.link)
+            title = getattr(entry, "title", "Postingan Baru")
+            summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
+            # Clean HTML tags from summary for caption
+            clean_caption = re.sub(r"<[^>]+>", " ", summary)
+            clean_caption = " ".join(clean_caption.split()).strip()
+            
+            # Try to find image url from media_content or enclosures
+            image_url = None
+            imgs = re.findall(r'<img[^>]+src=[\x22\x27]([^\x22\x27]+)[\x22\x27]', summary)
+            if imgs:
+                image_url = imgs[0]
+            elif hasattr(entry, "media_content") and entry.media_content:
+                image_url = entry.media_content[0].get("url")
+            elif hasattr(entry, "enclosures") and entry.enclosures:
+                image_url = entry.enclosures[0].get("href")
 
-        posts.append({
-            "id": post_id,
-            "account": account_name,
-            "title": title,
-            "caption": clean_caption,
-            "url": entry.link,
-            "image_url": image_url,
-            "published_at": getattr(entry, "published", datetime.utcnow().isoformat())
-        })
+            combined_text = f"{title} {clean_caption}"
+
+            posts.append({
+                "id": post_id,
+                "account": account_name,
+                "title": title,
+                "caption": clean_caption,
+                "url": entry.link,
+                "image_url": image_url,
+                "combined_text": combined_text,
+                "published_at": getattr(entry, "published", datetime.utcnow().isoformat())
+            })
+    except Exception as e:
+        logger.error(f"Error fetching RSS from {feed_url}: {e}")
+
     return posts
 
 def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[str, Any]]:
     """
     Fetches latest posts using Instaloader.
     NOTE: Instagram strictly rate-limits or blocks anonymous scraping.
-    If you experience issues, consider logging in via IG_USERNAME/IG_PASSWORD or using RSSHub.
     """
     try:
         import instaloader
@@ -135,18 +197,20 @@ def fetch_from_instaloader(account_name: str, max_posts: int = 5) -> List[Dict[s
                 "caption": caption,
                 "url": f"https://www.instagram.com/p/{post.shortcode}/",
                 "image_url": post.url,
+                "combined_text": caption,
                 "published_at": post.date_utc.isoformat() if post.date_utc else datetime.utcnow().isoformat()
             })
             count += 1
     except Exception as e:
-        logger.error(f"Error fetching from Instagram @{account_name} via Instaloader: {e}")
+        logger.debug(f"Could not fetch from Instagram @{account_name} anonymously: {e}")
     
     return posts
 
 async def check_new_lomba_posts() -> List[Dict[str, Any]]:
     """
-    Checks all configured accounts for new competition/hackathon posts.
-    Returns only posts that match keywords and have not been seen before.
+    Checks all configured tech RSS feeds and campus Instagram accounts.
+    Filters for Indonesian campus tech competitions (Hackathons, UI/UX, CTF, etc.).
+    Returns new matching competition posts.
     """
     new_competitions = []
 
@@ -166,36 +230,65 @@ async def check_new_lomba_posts() -> List[Dict[str, Any]]:
                     new_competitions.append(post)
         return new_competitions
 
-    # 2. Iterate through configured accounts
+    all_fetched_posts = []
+
+    # 2. Fetch from Dedicated Indonesian Campus Tech Feeds
+    for feed_url in config.TECH_RSS_FEEDS:
+        try:
+            feed_posts = await asyncio.to_thread(fetch_from_tech_rss, feed_url, "Info Lomba IT")
+            all_fetched_posts.extend(feed_posts)
+        except Exception as e:
+            logger.error(f"Error checking tech feed {feed_url}: {e}")
+
+    # 3. Fetch from Configured Instagram Accounts (RSS or Instaloader)
     for account in config.TARGET_ACCOUNTS:
         raw_posts = []
-
-        # Check RSS template if configured
         if config.RSS_FEED_TEMPLATE:
             feed_url = config.RSS_FEED_TEMPLATE.format(username=account)
-            # Run blocking network call in thread executor
             raw_posts = await asyncio.to_thread(fetch_from_rss, feed_url, account)
-        else:
-            # Fallback to Instaloader
-            raw_posts = await asyncio.to_thread(fetch_from_instaloader, account, 5)
+        elif config.IG_USERNAME and config.IG_PASSWORD:
+            raw_posts = await asyncio.to_thread(fetch_from_instaloader, account, 3)
+        all_fetched_posts.extend(raw_posts)
 
-        for post in raw_posts:
-            # Check if already processed
-            if database.is_post_seen(post["id"]):
-                continue
+    is_initial_seeding = database.get_total_posts_count() == 0
+    matched_candidates = []
 
-            # Check keyword relevance
-            matches = check_keywords(post["caption"])
-            if matches:
-                post["matched_keywords"] = matches
-                # Mark as seen
-                database.mark_post_seen(
-                    post_id=post["id"],
-                    account=post["account"],
-                    url=post["url"],
-                    title=post.get("title", f"Lomba Baru dari @{account}")
-                )
-                new_competitions.append(post)
+    for post in all_fetched_posts:
+        if database.is_post_seen(post["id"]):
+            continue
+
+        text_to_check = post.get("combined_text") or f"{post.get('title', '')} {post.get('caption', '')}"
+        matches = check_keywords(text_to_check)
+        if matches:
+            post["matched_keywords"] = matches
+            matched_candidates.append(post)
+
+    if not matched_candidates:
+        return []
+
+    # If first time running (empty DB), broadcast top 3 newest competitions and seed the rest
+    if is_initial_seeding:
+        logger.info(f"Initial run detected! Seeding {len(matched_candidates)} tech competitions. Broadcasting top 3.")
+        # Mark all candidates as seen in DB
+        for post in matched_candidates:
+            database.mark_post_seen(
+                post_id=post["id"],
+                account=post.get("account", "Info Lomba IT"),
+                url=post["url"],
+                title=post.get("title", "Info Lomba IT & Hackathon")
+            )
+        # Return top 3 newest to broadcast immediately
+        return matched_candidates[:3]
+
+    # Normal cycle: mark seen and return all new items
+    for post in matched_candidates:
+        database.mark_post_seen(
+            post_id=post["id"],
+            account=post.get("account", "Info Lomba IT"),
+            url=post["url"],
+            title=post.get("title", "Info Lomba IT & Hackathon")
+        )
+        new_competitions.append(post)
 
     return new_competitions
 

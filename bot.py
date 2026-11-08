@@ -35,25 +35,27 @@ def get_mention_string() -> str:
 
 def create_lomba_embed(post: dict) -> discord.Embed:
     """Creates a rich Discord Embed for a competition/hackathon post."""
-    title = post.get("title") or f"🏆 Lomba / Hackathon Baru dari @{post.get('account')}"
+    raw_title = post.get("title") or f"Lomba / Hackathon Baru dari {post.get('account')}"
+    title = f"🏆 {raw_title}" if not raw_title.startswith("🏆") else raw_title
     caption = post.get("caption", "").strip()
     
     # Truncate caption if too long for Discord Embed description (limit is 4096, keep it clean ~1200)
     if len(caption) > 1200:
-        caption = caption[:1200] + "... *(baca selengkapnya di Instagram)*"
+        caption = caption[:1200] + "... *(baca selengkapnya di tautan pendaftaran)*"
 
     embed = discord.Embed(
         title=title,
-        description=caption if caption else "*(Tidak ada caption)*",
+        description=caption if caption else "*(Tidak ada deskripsi)*",
         url=post.get("url"),
         color=discord.Color.from_rgb(46, 204, 113), # Emerald green
         timestamp=datetime.utcnow()
     )
 
+    account_name = post.get("account", "Info Lomba IT")
     embed.set_author(
-        name=f"Instagram: @{post.get('account')}",
-        url=f"https://instagram.com/{post.get('account')}",
-        icon_url="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png"
+        name=f"Info Lomba & Hackathon Kampus: {account_name}",
+        url=post.get("url"),
+        icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
 
     if post.get("image_url"):
@@ -62,17 +64,17 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     # Keywords detected
     keywords = post.get("matched_keywords", [])
     if keywords:
-        kw_string = ", ".join(f"`{k}`" for k in keywords[:5])
-        embed.add_field(name="🏷️ Kata Kunci", value=kw_string, inline=True)
+        kw_string = ", ".join(f"`{k}`" for k in keywords[:6])
+        embed.add_field(name="🏷️ Kategori / Kata Kunci", value=kw_string, inline=True)
 
     embed.add_field(
-        name="🔗 Sumber Asli",
-        value=f"[Klik untuk Buka Postingan Instagram]({post.get('url')})",
+        name="🔗 Pendaftaran & Detail Lengkap",
+        value=f"[Klik Di Sini untuk Buka Info & Guidebook]({post.get('url')})",
         inline=False
     )
 
     embed.set_footer(
-        text="Bot Pengingat Lomba & Hackathon • Tetap semangat berprestasi!",
+        text="Radar Lomba & Hackathon Kampus Indonesia 🇮🇩 • Tetap semangat berprestasi!",
         icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
     return embed
