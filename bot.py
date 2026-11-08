@@ -159,7 +159,18 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     )
 
     # 4. Tautan Resmi (Direct Instagram & Official Form links)
-    action_links = [f"[📱 Buka Postingan Instagram]({post_url})"]
+    action_links = []
+    if "/p/" in post_url or "/reel/" in post_url:
+        action_links.append(f"[📱 Buka Postingan Instagram]({post_url})")
+    elif "/explore/tags/" in post_url:
+        tag_clean = post_url.rstrip("/").split("/")[-1]
+        action_links.append(f"[📱 Postingan Instagram #{tag_clean}]({post_url})")
+    elif "instagram.com/" in post_url and post_url.rstrip("/") not in ("https://www.instagram.com", "https://instagram.com"):
+        handle_clean = post_url.rstrip("/").split("/")[-1]
+        action_links.append(f"[📱 Kunjungi Akun Instagram @{handle_clean}]({post_url})")
+    else:
+        action_links.append(f"[📱 Buka Instagram]({post_url})")
+
     if details["reg_link"]:
         action_links.append(f"[📝 Formulir Pendaftaran]({details['reg_link']})")
     if details["guidebook_link"]:
@@ -260,10 +271,10 @@ async def ping_test(interaction: discord.Interaction):
     msg += f"• **Akun IG Dipantau**: `{', '.join(config.TARGET_ACCOUNTS)}`"
 
     test_post = {
-        "account": "test_account",
+        "account": "@compfest",
         "title": "🎉 Tes Notifikasi Lomba Bot",
-        "caption": "Ini adalah pesan percobaan untuk memastikan format embed dan notifikasi ping berfungsi dengan sempurna!",
-        "url": "https://instagram.com",
+        "caption": "Ini adalah pesan percobaan untuk memastikan format embed dan notifikasi ping berfungsi dengan sempurna! Penyelenggara: Fakultas Ilmu Komputer UI (@compfest)",
+        "url": "https://www.instagram.com/p/DdECA40pnMK/",
         "image_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800",
         "matched_keywords": ["test", "hackathon"]
     }
@@ -277,28 +288,28 @@ async def test_lomba(interaction: discord.Interaction):
     await interaction.response.defer(thinking=True)
     try:
         sample_post = {
-            "id": "test_sample_itfest_ipb",
-            "title": "IT FEST 2026 - IPB University",
+            "id": "test_sample_compfest_ui",
+            "title": "COMPFEST 16 - Universitas Indonesia",
             "caption": (
-                "📢 IT FEST 2026 OFFICIALLY OPEN REGISTRATION!\n"
-                "Tema: Driving Sustainability In Nature Through Digital Innovation\n\n"
+                "📢 COMPFEST 16 IS OFFICIALLY OPEN FOR REGISTRATION!\n"
+                "Tema: Empowering Technological Innovations for Sustainable Future\n\n"
                 "Cabang Kompetisi:\n"
                 "• 🏴‍☠️ Capture The Flag (CTF)\n"
-                "• 💻 Software Development\n"
-                "• 🎬 Short Movie & Animation\n"
-                "• 🎨 UI/UX Design Competition\n\n"
-                "Penyelenggara: Himpunan Mahasiswa Ilmu Komputer IPB (@itfestmicroipb)\n"
-                "Batas Pendaftaran: 25 November 2026\n"
-                "Link Pendaftaran: https://bit.ly/PendaftaranITFest2026\n"
-                "Buku Panduan: https://bit.ly/GuideBookITFest2026"
+                "• 💻 Competitive Programming\n"
+                "• 🎨 UI/UX Design Competition\n"
+                "• 🤖 AI Innovation Challenge\n\n"
+                "Penyelenggara: Fakultas Ilmu Komputer Universitas Indonesia (@compfest)\n"
+                "Batas Pendaftaran: 30 November 2026\n"
+                "Link Pendaftaran: https://compfest.id/register\n"
+                "Buku Panduan: https://compfest.id/guidebook"
             ),
-            "url": "https://www.instagram.com/itfestmicroipb/",
+            "url": "https://www.instagram.com/p/DdECA40pnMK/",
             "image_url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800",
-            "account": "@itfestmicroipb",
-            "matched_keywords": ["ctf", "ui/ux", "software development", "short movie"]
+            "account": "@compfest",
+            "matched_keywords": ["ctf", "ui/ux", "ai", "competitive programming"]
         }
         embed = create_lomba_embed(sample_post)
-        await interaction.followup.send(content="✨ **Berikut contoh tampilan format kartu lomba langsung dari Instagram:**", embed=embed)
+        await interaction.followup.send(content="✨ **Berikut contoh tampilan format kartu lomba langsung menuju ke postingan Instagram:**", embed=embed)
     except Exception as e:
         await interaction.followup.send(f"❌ Error: `{e}`")
 

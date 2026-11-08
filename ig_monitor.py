@@ -13,24 +13,24 @@ logger = logging.getLogger(__name__)
 SAMPLE_MOCK_POSTS = [
     {
         "id": "mock_hackathon_001",
-        "account": "hackathon_id",
-        "title": "National Tech Hackathon 2026 - Innovation for AI & Cloud",
+        "account": "@compfest",
+        "title": "COMPFEST 16 - National Tech Hackathon & Innovation Challenge",
         "caption": (
             "🔥 REGISTRASI TELAH DIBUKA! 🔥\n\n"
-            "Tunjukkan solusi inovatifmu di National Tech Hackathon 2026! "
+            "Tunjukkan solusi inovatifmu di COMPFEST Hackathon!\n"
             "Kategori: Web & Mobile App, AI Solutions, Cybersecurity.\n\n"
             "🏆 Total Hadiah: Rp 75.000.000 + Beasiswa & Sertifikat Nasional\n"
             "📅 Deadline Pendaftaran: 30 November 2026\n"
-            "📍 Lokasi: Hybrid (Online & Final di Jakarta)\n\n"
-            "Bentuk timmu (1-3 orang) dan daftarkan segera sekarang juga! Link di bio @hackathon_id."
+            "📍 Penyelenggara: Fakultas Ilmu Komputer Universitas Indonesia (@compfest)\n\n"
+            "Bentuk timmu dan daftarkan segera sekarang juga! Link di bio @compfest."
         ),
-        "url": "https://www.instagram.com/p/mock_hackathon_001/",
+        "url": "https://www.instagram.com/p/DdECA40pnMK/",
         "image_url": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800",
         "published_at": datetime.utcnow().isoformat(),
     },
     {
         "id": "mock_hackathon_002",
-        "account": "infolomba",
+        "account": "@infolomba",
         "title": "Lomba Competitive Programming & UI/UX Design Competition",
         "caption": (
             "🚀 CALL FOR PARTICIPANTS: Compfest IT Challenge 2026 🚀\n\n"
@@ -39,7 +39,7 @@ SAMPLE_MOCK_POSTS = [
             "✨ Benefits:\n- E-Certificate\n- Mentoring Session\n- Total Hadiah Rp 35.000.000\n\n"
             "Yuk asah kemampuan coding dan design kamu! Cek link pendaftaran di bio."
         ),
-        "url": "https://www.instagram.com/p/mock_hackathon_002/",
+        "url": "https://www.instagram.com/p/DdLCkIrE9s9/",
         "image_url": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800",
         "published_at": datetime.utcnow().isoformat(),
     }
