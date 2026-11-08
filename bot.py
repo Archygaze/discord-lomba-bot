@@ -263,6 +263,36 @@ async def ping_test(interaction: discord.Interaction):
 
     await interaction.response.send_message(content=msg, embed=embed)
 
+@bot.tree.command(name="test_lomba", description="Kirimkan 1 contoh postingan lomba kampus terbaru untuk melihat format kartu.")
+async def test_lomba(interaction: discord.Interaction):
+    """Sends a sample real competition post for verification."""
+    await interaction.response.defer(thinking=True)
+    try:
+        sample_post = {
+            "id": "test_sample_itfest",
+            "title": "IT FEST 2026 - IPB University",
+            "caption": (
+                "📢 IT FEST 2026 OFFICIALLY OPEN!\n"
+                "Tema: Driving Sustainability In Nature Through Digital Innovation\n\n"
+                "Cabang Kompetisi:\n"
+                "• 🏴‍☠️ Capture The Flag (CTF)\n"
+                "• 💻 Software Development\n"
+                "• 🎬 Short Movie\n"
+                "• 🌐 IT Network System Administration\n\n"
+                "Penyelenggara: Himpunan Mahasiswa Ilmu Komputer IPB (@itfestmicroipb)\n"
+                "Batas Pendaftaran: 25 November 2026\n"
+                "Link Pendaftaran: https://bit.ly/PendaftaranITFest2026\n"
+                "Guidebook: https://bit.ly/GuideBookITFest2026"
+            ),
+            "url": "https://instagram.com/itfestmicroipb",
+            "image_url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800",
+            "account": "Himpunan Mahasiswa Ilmu Komputer IPB"
+        }
+        embed = create_lomba_embed(sample_post)
+        await interaction.followup.send(content="✨ **Berikut contoh tampilan format kartu lomba kampus:**", embed=embed)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: `{e}`")
+
 @bot.tree.command(name="check_lomba", description="Cek manual postingan lomba baru sekarang.")
 async def check_lomba(interaction: discord.Interaction):
     """Manually triggers an Instagram check."""
