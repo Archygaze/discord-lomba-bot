@@ -1,6 +1,8 @@
 import os
 import sys
 import logging
+import html
+import re
 import discord
 from discord.ext import commands, tasks
 from datetime import datetime
@@ -38,61 +40,134 @@ def get_mention_string() -> str:
         return f"<@&{role_config}>"
     return ""
 
+def parse_competition_details(caption: str, title: str, account: str) -> dict:
+    """Cleans and extracts structured fields from raw Indonesian competition text."""
+    # 1. Clean HTML entities and spaces
+    text = html.unescape(caption).replace('\xa0', ' ').replace('&nbsp;', ' ')
+    text = re.sub(r'[\r\t]+', ' ', text)
+
+    # 2. Extract Real Campus Organizer
+    organizer = account
+    org_match = re.search(
+        r'((?:HIMA|BEM|HMIF|Himpunan|Fakultas|Universitas|Institut|Politeknik|Divisi Humas)[^\n#\.\!\?]{3,80})',
+        text,
+        re.IGNORECASE
+    )
+    if org_match:
+        organizer = org_match.group(1).strip()
+    elif "@" in text:
+        ig_mentions = re.findall(r'@([a-zA-Z0-9_\.]{3,30})', text)
+        if ig_mentions:
+            organizer = f"@{ig_mentions[0]}"
+
+    # 3. Extract Categories / Cabang Kompetisi
+    branches = []
+    cat_match = re.search(
+        r'(?:Cabang Kompetisi|Kategori Lomba|Cabang Lomba|Divisi Lomba)[:\s]+(.*?)(?=✨|💰|📅|🔗|Kenapa|Biaya|Pendaftaran|Timeline|🎁|$)',
+        text,
+        re.DOTALL | re.IGNORECASE
+    )
+    if cat_match:
+        items = [
+            c.strip() for c in re.split(r'[\n•\-\*]|(?=[🎮💼📄🚀💻🎬🎨🌐])', cat_match.group(1))
+            if len(c.strip()) > 3 and not c.strip().startswith("http")
+        ]
+        branches = items[:4]
+
+    # 4. Extract Deadline
+    deadline = None
+    dl_match = re.search(
+        r'(?:Batas Pendaftaran|Deadline|Pendaftaran s/d|Pendaftaran Terakhir|Pendaftaran)[:\s]+([0-9]{1,2}\s+[A-Za-z]+(?:\s+[0-9]{4})?|[0-9]{1,2}/[0-9]{1,2}/[0-9]{4})',
+        text,
+        re.IGNORECASE
+    )
+    if dl_match:
+        deadline = dl_match.group(1).strip()
+
+    # 5. Extract Registration & Guidebook Links
+    all_links = re.findall(r'https?://[^\s\x22\x27<>]+', text)
+    reg_link = None
+    guidebook_link = None
+    for link in all_links:
+        link_lower = link.lower()
+        if any(gb in link_lower for gb in ["guidebook", "juknis", "panduan", "buku-panduan", "guide"]):
+            guidebook_link = link
+        elif any(reg in link_lower for reg in ["daftar", "registrasi", "form", "pendaftaran", "bit.ly"]):
+            if not reg_link:
+                reg_link = link
+
+    if not reg_link and all_links:
+        reg_link = all_links[0]
+
+    return {
+        "organizer": organizer,
+        "branches": branches,
+        "deadline": deadline,
+        "reg_link": reg_link,
+        "guidebook_link": guidebook_link
+    }
+
 def create_lomba_embed(post: dict) -> discord.Embed:
-    """Creates a rich Discord Embed for a competition/hackathon post."""
-    raw_title = post.get("title") or f"Lomba Baru dari {post.get('account')}"
+    """Creates a clean, minimal, non-overwhelming Discord Embed."""
+    raw_title = post.get("title") or f"Lomba Kampus: {post.get('account')}"
     title = f"🏆 {raw_title}" if not raw_title.startswith("🏆") else raw_title
     caption = post.get("caption", "").strip()
-    
-    # Truncate caption if too long for Discord Embed description (limit is 4096, keep it clean ~1200)
-    if len(caption) > 1200:
-        caption = caption[:1200] + "... *(baca selengkapnya di tautan pendaftaran)*"
+
+    # Parse metadata cleanly
+    details = parse_competition_details(caption, raw_title, post.get("account", "Instagram Kampus"))
 
     embed = discord.Embed(
         title=title,
-        description=caption if caption else "*(Tidak ada deskripsi)*",
         url=post.get("url"),
         color=discord.Color.from_rgb(46, 204, 113), # Emerald green
         timestamp=datetime.utcnow()
     )
 
-    account_name = post.get("account", "Info Lomba Kampus")
+    # Clean author header with actual campus organizer
     embed.set_author(
-        name=f"Info Lomba Kampus: {account_name}",
+        name=f"🏛️ {details['organizer']}",
         url=post.get("url"),
-        icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
+        icon_url="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png"
+    )
+
+    # 1. Cabang Lomba (Structured, short, elegant)
+    if details["branches"]:
+        branches_str = "\n".join(f"• {b}" for b in details["branches"])
+        embed.add_field(name="🎯 Cabang Kompetisi", value=branches_str, inline=False)
+    elif post.get("matched_keywords"):
+        kw_string = ", ".join(f"`{k}`" for k in post["matched_keywords"][:5])
+        embed.add_field(name="🎯 Kategori Lomba", value=kw_string, inline=False)
+
+    # 2. Timeline / Deadline
+    if details["deadline"]:
+        embed.add_field(name="📅 Batas Pendaftaran", value=f"**{details['deadline']}**", inline=True)
+
+    # 3. Status Verifikasi
+    embed.add_field(
+        name="🛡️ Keaslian",
+        value="✅ Terverifikasi Resmi",
+        inline=True
+    )
+
+    # 4. Tautan Resmi (Clean direct buttons / links)
+    action_links = []
+    if details["reg_link"]:
+        action_links.append(f"[📝 Formulir Pendaftaran]({details['reg_link']})")
+    if details["guidebook_link"]:
+        action_links.append(f"[📖 Buku Panduan]({details['guidebook_link']})")
+    action_links.append(f"[📱 Buka Postingan Asli]({post.get('url')})")
+
+    embed.add_field(
+        name="📌 Tautan Lengkap",
+        value=" • ".join(action_links),
+        inline=False
     )
 
     if post.get("image_url"):
         embed.set_image(url=post["image_url"])
 
-    # Keywords detected
-    keywords = post.get("matched_keywords", [])
-    if keywords:
-        kw_string = ", ".join(f"`{k}`" for k in keywords[:6])
-        embed.add_field(name="🏷️ Kategori Lomba", value=kw_string, inline=True)
-
-    # Verification / Legitimacy badge
-    embed.add_field(
-        name="🛡️ Status Keaslian",
-        value="✅ **Penyelenggara Terverifikasi**\n*(Bebas Scam & Terkurasi)*",
-        inline=True
-    )
-
-    # Check if Guidebook is provided
-    caption_lower = caption.lower()
-    has_guidebook = any(g in caption_lower for g in ["guidebook", "guide book", "juknis", "panduan", "buku panduan"])
-    if has_guidebook:
-        embed.add_field(name="📖 Buku Panduan", value="✅ Juknis/Guidebook Tersedia", inline=True)
-
-    embed.add_field(
-        name="🔗 Pendaftaran & Detail Lengkap",
-        value=f"[Klik Di Sini untuk Buka Info & Formulir Resmi]({post.get('url')})",
-        inline=False
-    )
-
     embed.set_footer(
-        text="fuck it we ball • Created by Archygaze • Radar Lomba Kampus 🇮🇩",
+        text="fuck it we ball • Radar Lomba Kampus 🇮🇩",
         icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
     return embed
