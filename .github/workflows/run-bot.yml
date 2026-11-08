@@ -71,3 +71,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run "24/7 Discord Lomba Bot" --ref master || gh workflow run "24/7 Discord Lomba Bot" --ref main || true
+
