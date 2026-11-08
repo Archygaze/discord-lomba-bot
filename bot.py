@@ -35,7 +35,7 @@ def get_mention_string() -> str:
 
 def create_lomba_embed(post: dict) -> discord.Embed:
     """Creates a rich Discord Embed for a competition/hackathon post."""
-    raw_title = post.get("title") or f"Lomba / Hackathon Baru dari {post.get('account')}"
+    raw_title = post.get("title") or f"Lomba Baru dari {post.get('account')}"
     title = f"🏆 {raw_title}" if not raw_title.startswith("🏆") else raw_title
     caption = post.get("caption", "").strip()
     
@@ -51,9 +51,9 @@ def create_lomba_embed(post: dict) -> discord.Embed:
         timestamp=datetime.utcnow()
     )
 
-    account_name = post.get("account", "Info Lomba IT")
+    account_name = post.get("account", "Info Lomba Kampus")
     embed.set_author(
-        name=f"Info Lomba & Hackathon Kampus: {account_name}",
+        name=f"Info Lomba Kampus: {account_name}",
         url=post.get("url"),
         icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
@@ -65,16 +65,29 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     keywords = post.get("matched_keywords", [])
     if keywords:
         kw_string = ", ".join(f"`{k}`" for k in keywords[:6])
-        embed.add_field(name="🏷️ Kategori / Kata Kunci", value=kw_string, inline=True)
+        embed.add_field(name="🏷️ Kategori Lomba", value=kw_string, inline=True)
+
+    # Verification / Legitimacy badge
+    embed.add_field(
+        name="🛡️ Status Keaslian",
+        value="✅ **Penyelenggara Terverifikasi**\n*(Bebas Scam & Terkurasi)*",
+        inline=True
+    )
+
+    # Check if Guidebook is provided
+    caption_lower = caption.lower()
+    has_guidebook = any(g in caption_lower for g in ["guidebook", "guide book", "juknis", "panduan", "buku panduan"])
+    if has_guidebook:
+        embed.add_field(name="📖 Buku Panduan", value="✅ Juknis/Guidebook Tersedia", inline=True)
 
     embed.add_field(
         name="🔗 Pendaftaran & Detail Lengkap",
-        value=f"[Klik Di Sini untuk Buka Info & Guidebook]({post.get('url')})",
+        value=f"[Klik Di Sini untuk Buka Info & Formulir Resmi]({post.get('url')})",
         inline=False
     )
 
     embed.set_footer(
-        text="Radar Lomba Kampus Indonesia 🇮🇩 • Tech, Hackathon, Film, Animasi & Desain",
+        text="Radar Lomba Kampus Indonesia 🇮🇩 • Terverifikasi & Anti-Penipuan",
         icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
     return embed

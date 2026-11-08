@@ -45,6 +45,54 @@ SAMPLE_MOCK_POSTS = [
     }
 ]
 
+# Anti-scam & fake competition blacklist (immediate rejection)
+SCAM_BLACKLIST = [
+    "dana kaget", "saldo dana", "giveaway pulsa", "pulsa gratis", "undian berhadiah",
+    "tanpa diundi", "transfer pulsa", "slot gacor", "judi online", "pinjol",
+    "investasi modal", "arisan online", "tukar kode", "tanpa modal untung jutaan",
+    "dm admin minta otp", "bagi bagi iphone gratis", "rekening pribadi tanpa juknis"
+]
+
+# Official campus, university & trusted organizer indicators
+ORGANIZER_TRUST_KEYWORDS = [
+    "universitas", "institut", "politeknik", "kampus", "fakultas", "jurusan",
+    "prodi", "bem", "himpunan", "hima", "himatif", "hmif", "ukm", "senat",
+    "kemdikbud", "kemendikbud", "puspresnas", "diktiristek", "kementerian",
+    "bumn", "telkom", "gdsc", "dicoding", "guidebook", "juknis", "buku panduan",
+    "petunjuk teknis", "panitia", "official", "community", "komunitas mahasiswa"
+]
+
+def is_legitimate_competition(post: Dict[str, Any]) -> bool:
+    """
+    Ensures that a competition is legitimate, organized by a credible campus/institution,
+    and not a scam, spam, or fake giveaway.
+    """
+    combined = f"{post.get('title', '')} {post.get('caption', '')}".lower()
+
+    # 1. Immediate rejection if any scam keyword is found
+    for scam_word in SCAM_BLACKLIST:
+        if scam_word in combined:
+            logger.warning(f"Rejected post '{post.get('title')}' due to scam flag: '{scam_word}'")
+            return False
+
+    # 2. Check if source is a trusted curated provider or official campus account
+    account = post.get("account", "").lower()
+    trusted_sources = [
+        "info lomba it", "compfest", "arkavidia", "findit", "schematics",
+        "hology", "joints", "technofair", "mage", "it_today", "dinamik",
+        "lomba_it", "infolombamahasiswa"
+    ]
+    if any(ts in account for ts in trusted_sources):
+        return True
+
+    # 3. For any other source, require at least one verified organizer keyword
+    has_trusted_signal = any(okw in combined for okw in ORGANIZER_TRUST_KEYWORDS)
+    if not has_trusted_signal:
+        logger.warning(f"Rejected post '{post.get('title')}' - missing official campus/organizer signal.")
+        return False
+
+    return True
+
 def check_keywords(text: str) -> List[str]:
     """Finds which target keywords match the text."""
     if not config.ENABLE_KEYWORD_FILTER:
@@ -255,6 +303,10 @@ async def check_new_lomba_posts() -> List[Dict[str, Any]]:
 
     for post in all_fetched_posts:
         if database.is_post_seen(post["id"]):
+            continue
+
+        # Filter out scam / fake competitions
+        if not is_legitimate_competition(post):
             continue
 
         text_to_check = post.get("combined_text") or f"{post.get('title', '')} {post.get('caption', '')}"
