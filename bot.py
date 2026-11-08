@@ -18,7 +18,12 @@ logger = logging.getLogger("LombaBot")
 
 # Discord Intents
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents,
+    status=discord.Status.dnd,
+    activity=discord.CustomActivity(name="fuck it we ball • created by Archygaze")
+)
 
 def get_mention_string() -> str:
     """Builds the mention string based on configuration."""
@@ -109,10 +114,10 @@ async def broadcast_post(channel: discord.TextChannel, post: dict):
 async def on_ready():
     logger.info(f"Logged in as {bot.user.name} (ID: {bot.user.id})")
     
-    # Set Discord presence / activity
+    # Set Discord presence / activity to Do Not Disturb (DND)
     try:
         activity = discord.CustomActivity(name="fuck it we ball • created by Archygaze")
-        await bot.change_presence(activity=activity, status=discord.Status.online)
+        await bot.change_presence(activity=activity, status=discord.Status.dnd)
     except Exception as e:
         logger.debug(f"Could not set custom activity: {e}")
 
