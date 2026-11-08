@@ -215,7 +215,7 @@ async def status(interaction: discord.Interaction):
     
     embed = discord.Embed(
         title="🤖 Status Bot Info Lomba Kampus Indonesia",
-        description="*\"fuck it we ball\"* • Created by **Archygaze**\nMemantau lomba Teknologi (Hackathon, UI/UX, CTF) & Seni (Film, Animasi, Desain)",
+        description="Created by **Archygaze**\nMemantau lomba Teknologi (Hackathon, UI/UX, CTF) & Seni (Film, Animasi, Desain)",
         color=discord.Color.blue(),
         timestamp=datetime.utcnow()
     )
