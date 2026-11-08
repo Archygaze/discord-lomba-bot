@@ -42,7 +42,7 @@ jobs:
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           DISCORD_PING_ROLE_ID: ${{ secrets.DISCORD_PING_ROLE_ID }}
           CHECK_INTERVAL_MINUTES: ${{ vars.CHECK_INTERVAL_MINUTES || secrets.CHECK_INTERVAL_MINUTES || '30' }}
-          TARGET_ACCOUNTS: ${{ vars.TARGET_ACCOUNTS || secrets.TARGET_ACCOUNTS || 'hackathon_id,infolomba,lombanasional,eventkampus' }}
+          TARGET_ACCOUNTS: ${{ vars.TARGET_ACCOUNTS || secrets.TARGET_ACCOUNTS || 'compfest,arkavidia,finditugm,schematics.its,hology_ub,jointsugm,technofair,mage_its,it_today_ipb,dinamik_upi,lomba_it,infolombamahasiswa,infolomba' }}
           ENABLE_KEYWORD_FILTER: ${{ vars.ENABLE_KEYWORD_FILTER || secrets.ENABLE_KEYWORD_FILTER || 'true' }}
           RSS_FEED_TEMPLATE: ${{ vars.RSS_FEED_TEMPLATE || secrets.RSS_FEED_TEMPLATE || '' }}
           ENABLE_MOCK_DATA: ${{ vars.ENABLE_MOCK_DATA || secrets.ENABLE_MOCK_DATA || 'false' }}

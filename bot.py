@@ -74,7 +74,7 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     )
 
     embed.set_footer(
-        text="Radar Lomba & Hackathon Kampus Indonesia 🇮🇩 • Tetap semangat berprestasi!",
+        text="Radar Lomba Kampus Indonesia 🇮🇩 • Tech, Hackathon, Film, Animasi & Desain",
         icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
     return embed

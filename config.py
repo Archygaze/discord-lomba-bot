@@ -42,17 +42,23 @@ TECH_RSS_FEEDS = [f.strip() for f in raw_feeds.split(",") if f.strip()]
 # e.g., if you have an RSSHub instance: https://rsshub.app/instagram/user/{username}
 RSS_FEED_TEMPLATE = os.getenv("RSS_FEED_TEMPLATE", "")
 
-# Keywords to identify campus tech/hackathon posts (case-insensitive)
+# Keywords to identify campus tech & creative arts posts (case-insensitive)
 DEFAULT_KEYWORDS = (
+    # Teknologi, Coding & Hackathon
     "hackathon,hackfest,ui/ux,ui ux,ux design,ui design,user experience,user interface,"
     "product design,ctf,capture the flag,cyber security,cybersecurity,keamanan siber,"
     "infosec,competitive programming,coding,algoritma,pemrograman,data science,datathon,"
     "data analytics,machine learning,artificial intelligence,ai,software engineering,"
     "software development,web development,web dev,web design,mobile dev,mobile app,android,"
     "ios,game dev,game development,iot,internet of things,lomba it,kompetisi it,tech competition,"
-    "lomba teknologi,it case,business it,it contest,ideation tech,network computer"
+    "lomba teknologi,it case,business it,it contest,ideation tech,network computer,"
+    # Seni, Film, Animasi & Gambar (Kesenian Kampus)
+    "film pendek,short movie,videografi,sinematografi,video kreatif,filmmaking,movie,"
+    "animasi,animation,2d animation,3d animation,motion graphic,motion design,"
+    "desain grafis,graphic design,ilustrasi,illustration,poster,infografis,drawing,"
+    "gambar,digital art,komik,comic,fotografi,photography,multimedia,seni digital"
 )
-RAW_KEYWORDS = os.getenv("KEYWORDS", DEFAULT_KEYWORDS)
+RAW_KEYWORDS = os.getenv("KEYWORDS") or DEFAULT_KEYWORDS
 KEYWORDS = [k.strip().lower() for k in RAW_KEYWORDS.split(",") if k.strip()]
 ENABLE_KEYWORD_FILTER = os.getenv("ENABLE_KEYWORD_FILTER", "true").lower() in ("1", "true", "yes")
 
