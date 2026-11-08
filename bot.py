@@ -22,7 +22,7 @@ bot = commands.Bot(
     command_prefix="!",
     intents=intents,
     status=discord.Status.dnd,
-    activity=discord.CustomActivity(name="fuck it we ball • created by Archygaze")
+    activity=discord.CustomActivity(name="fuck it we ball")
 )
 
 def get_mention_string() -> str:
@@ -116,7 +116,7 @@ async def on_ready():
     
     # Set Discord presence / activity to Do Not Disturb (DND)
     try:
-        activity = discord.CustomActivity(name="fuck it we ball • created by Archygaze")
+        activity = discord.CustomActivity(name="fuck it we ball")
         await bot.change_presence(activity=activity, status=discord.Status.dnd)
     except Exception as e:
         logger.debug(f"Could not set custom activity: {e}")
