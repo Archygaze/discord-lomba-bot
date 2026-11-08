@@ -62,6 +62,72 @@ ORGANIZER_TRUST_KEYWORDS = [
     "petunjuk teknis", "panitia", "official", "community", "komunitas mahasiswa"
 ]
 
+CLOSED_KEYWORDS = [
+    "pendaftaran ditutup", "pendaftaran telah ditutup", "registration closed",
+    "sold out", "closed registration", "telah selesai", "pengumuman pemenang",
+    "penutupan pendaftaran", "pendaftaran berakhir"
+]
+
+INDONESIAN_MONTHS = {
+    'januari': 1, 'jan': 1, 'februari': 2, 'feb': 2, 'maret': 3, 'mar': 3,
+    'april': 4, 'apr': 4, 'mei': 5, 'may': 5, 'juni': 6, 'jun': 6,
+    'juli': 7, 'jul': 7, 'agustus': 8, 'agu': 8, 'agt': 8, 'august': 8,
+    'september': 9, 'sep': 9, 'oktober': 10, 'okt': 10, 'october': 10,
+    'november': 11, 'nov': 11, 'desember': 12, 'des': 12, 'december': 12
+}
+
+def is_registration_active(post: Dict[str, Any]) -> bool:
+    """
+    Ensures that the competition is still available for participants to sign up.
+    Filters out any competitions whose registration deadlines have passed.
+    """
+    import unicodedata
+    caption = post.get("caption", "")
+    title = post.get("title", "")
+    combined_raw = f"{title} {caption}"
+    text_lower = combined_raw.lower()
+
+    # 1. Immediately reject if marked explicitly closed or concluded
+    for ck in CLOSED_KEYWORDS:
+        if ck in text_lower:
+            logger.info(f"Skipped expired post '{title}': explicitly marked closed ('{ck}').")
+            return False
+
+    # 2. Normalize bold/italic unicode numbers and extract timeline dates
+    normalized = unicodedata.normalize('NFKD', combined_raw)
+    now = datetime.now()
+
+    # Match '14 Juni 2026', '5 Agustus 2026', etc.
+    word_dates = re.findall(r'([0-9]{1,2})\s+([A-Za-z]+)(?:\s+([0-9]{4}))?', normalized)
+    found_dates = []
+    for d_str, m_str, y_str in word_dates:
+        m_lower = m_str.lower()
+        if m_lower in INDONESIAN_MONTHS:
+            try:
+                year = int(y_str) if y_str else now.year
+                month = INDONESIAN_MONTHS[m_lower]
+                day = int(d_str)
+                found_dates.append(datetime(year, month, day))
+            except ValueError:
+                pass
+
+    # Match slash dates like '14/06/2026'
+    slash_dates = re.findall(r'([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})', normalized)
+    for d_str, m_str, y_str in slash_dates:
+        try:
+            found_dates.append(datetime(int(y_str), int(m_str), int(d_str)))
+        except ValueError:
+            pass
+
+    # 3. If dates exist in the post and the latest date is in the past, reject
+    if found_dates:
+        latest_date = max(found_dates)
+        if latest_date.date() < now.date():
+            logger.info(f"Skipped expired competition '{title}': deadline {latest_date.strftime('%d %b %Y')} has passed.")
+            return False
+
+    return True
+
 def is_legitimate_competition(post: Dict[str, Any]) -> bool:
     """
     Ensures that a competition is legitimate, organized by a credible campus/institution,
@@ -402,6 +468,10 @@ async def check_new_lomba_posts() -> List[Dict[str, Any]]:
 
         # Filter out scam / fake competitions
         if not is_legitimate_competition(post):
+            continue
+
+        # Filter out expired / closed competitions (only post if still available to sign up!)
+        if not is_registration_active(post):
             continue
 
         text_to_check = post.get("combined_text") or f"{post.get('title', '')} {post.get('caption', '')}"

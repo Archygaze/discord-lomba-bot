@@ -42,8 +42,11 @@ def get_mention_string() -> str:
 
 def parse_competition_details(caption: str, title: str, account: str) -> dict:
     """Cleans and extracts structured fields from raw Indonesian competition text."""
-    # 1. Clean HTML entities and spaces
+    import unicodedata
+
+    # 1. Clean HTML entities, spaces, and normalize unicode mathematical bold numbers
     text = html.unescape(caption).replace('\xa0', ' ').replace('&nbsp;', ' ')
+    text = unicodedata.normalize('NFKD', text)
     text = re.sub(r'[\r\t]+', ' ', text)
 
     # 2. Extract Real Campus Organizer
@@ -149,7 +152,9 @@ def create_lomba_embed(post: dict) -> discord.Embed:
 
     # 2. Timeline / Deadline
     if details["deadline"]:
-        embed.add_field(name="📅 Batas Pendaftaran", value=f"**{details['deadline']}**", inline=True)
+        embed.add_field(name="📅 Batas Pendaftaran", value=f"**{details['deadline']}** (🟢 Masih Dibuka)", inline=True)
+    else:
+        embed.add_field(name="📅 Pendaftaran", value="**🟢 Terbuka / Masih Dibuka**", inline=True)
 
     # 3. Status Verifikasi
     embed.add_field(
