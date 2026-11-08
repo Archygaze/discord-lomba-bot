@@ -1,0 +1,73 @@
+name: 24/7 Discord Lomba Bot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+  schedule:
+    - cron: '0 */5 * * *'
+
+# Ensure only ONE instance of the bot ever runs at a time
+concurrency:
+  group: discord-lomba-bot-runner
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Discord Lomba Bot (5.3h cycle)
+        env:
+          PYTHONUNBUFFERED: "1"
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          DISCORD_PING_ROLE_ID: ${{ secrets.DISCORD_PING_ROLE_ID }}
+          CHECK_INTERVAL_MINUTES: ${{ vars.CHECK_INTERVAL_MINUTES || secrets.CHECK_INTERVAL_MINUTES || '30' }}
+          TARGET_ACCOUNTS: ${{ vars.TARGET_ACCOUNTS || secrets.TARGET_ACCOUNTS || 'hackathon_id,infolomba,lombanasional,eventkampus' }}
+          ENABLE_KEYWORD_FILTER: ${{ vars.ENABLE_KEYWORD_FILTER || secrets.ENABLE_KEYWORD_FILTER || 'true' }}
+          RSS_FEED_TEMPLATE: ${{ vars.RSS_FEED_TEMPLATE || secrets.RSS_FEED_TEMPLATE || '' }}
+          ENABLE_MOCK_DATA: ${{ vars.ENABLE_MOCK_DATA || secrets.ENABLE_MOCK_DATA || 'false' }}
+          IG_USERNAME: ${{ secrets.IG_USERNAME || '' }}
+          IG_PASSWORD: ${{ secrets.IG_PASSWORD || '' }}
+        run: |
+          # Run for 5 hours 20 minutes (19200s), then exit cleanly so the next cycle triggers
+          timeout 19200s python bot.py || true
+
+      - name: Persist seen posts database
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f lomba_history.db ]; then
+            git add -f lomba_history.db
+            if ! git diff --staged --quiet; then
+              git commit -m "chore: persist seen posts database [skip ci]"
+              git push origin HEAD || true
+            fi
+          fi
+
+      - name: Automatically trigger next 24/7 cycle
+        if: "!cancelled()"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "24/7 Discord Lomba Bot" --ref master || gh workflow run "24/7 Discord Lomba Bot" --ref main || true
