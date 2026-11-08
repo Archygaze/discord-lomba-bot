@@ -318,19 +318,18 @@ async def check_new_lomba_posts() -> List[Dict[str, Any]]:
     if not matched_candidates:
         return []
 
-    # If first time running (empty DB), broadcast top 3 newest competitions and seed the rest
+    # If first time running (empty DB), silently seed all existing posts so bot does NOT spam or ping on update/startup
     if is_initial_seeding:
-        logger.info(f"Initial run detected! Seeding {len(matched_candidates)} tech competitions. Broadcasting top 3.")
-        # Mark all candidates as seen in DB
+        logger.info(f"Initial run/update: Silently seeding {len(matched_candidates)} existing posts into database. No notifications or pings sent.")
         for post in matched_candidates:
             database.mark_post_seen(
                 post_id=post["id"],
-                account=post.get("account", "Info Lomba IT"),
+                account=post.get("account", "Instagram Kampus"),
                 url=post["url"],
-                title=post.get("title", "Info Lomba IT & Hackathon")
+                title=post.get("title", "Lomba Kampus")
             )
-        # Return top 3 newest to broadcast immediately
-        return matched_candidates[:3]
+        # Return empty list: SILENT on startup/updates!
+        return []
 
     # Normal cycle: mark seen and return all new items
     for post in matched_candidates:
