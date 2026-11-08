@@ -87,7 +87,7 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     )
 
     embed.set_footer(
-        text="Radar Lomba Kampus Indonesia 🇮🇩 • Terverifikasi & Anti-Penipuan",
+        text="fuck it we ball • Created by Archygaze • Radar Lomba Kampus 🇮🇩",
         icon_url="https://cdn-icons-png.flaticon.com/512/3112/3112946.png"
     )
     return embed
@@ -109,6 +109,13 @@ async def broadcast_post(channel: discord.TextChannel, post: dict):
 async def on_ready():
     logger.info(f"Logged in as {bot.user.name} (ID: {bot.user.id})")
     
+    # Set Discord presence / activity
+    try:
+        activity = discord.CustomActivity(name="fuck it we ball • created by Archygaze")
+        await bot.change_presence(activity=activity, status=discord.Status.online)
+    except Exception as e:
+        logger.debug(f"Could not set custom activity: {e}")
+
     # Sync slash commands with Discord
     try:
         synced = await bot.tree.sync()
@@ -202,7 +209,8 @@ async def status(interaction: discord.Interaction):
     accounts_str = ", ".join(f"@{acc}" for acc in config.TARGET_ACCOUNTS)
     
     embed = discord.Embed(
-        title="🤖 Status Bot Info Lomba & Hackathon",
+        title="🤖 Status Bot Info Lomba Kampus Indonesia",
+        description="*\"fuck it we ball\"* • Created by **Archygaze**\nMemantau lomba Teknologi (Hackathon, UI/UX, CTF) & Seni (Film, Animasi, Desain)",
         color=discord.Color.blue(),
         timestamp=datetime.utcnow()
     )
