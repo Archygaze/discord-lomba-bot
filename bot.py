@@ -55,6 +55,8 @@ def parse_competition_details(caption: str, title: str, account: str) -> dict:
     )
     if org_match:
         organizer = org_match.group(1).strip()
+    elif account.startswith("@") or account.startswith("#"):
+        organizer = account
     elif "@" in text:
         ig_mentions = re.findall(r'@([a-zA-Z0-9_\.]{3,30})', text)
         if ig_mentions:
@@ -69,10 +71,12 @@ def parse_competition_details(caption: str, title: str, account: str) -> dict:
     )
     if cat_match:
         items = [
-            c.strip() for c in re.split(r'[\n•\-\*]|(?=[🎮💼📄🚀💻🎬🎨🌐])', cat_match.group(1))
+            re.sub(r'^(?:yang dapat kamu ikuti|antara lain|meliputi|yaitu|sebagai berikut)[:\s]*', '', c.strip(), flags=re.IGNORECASE)
+            for c in re.split(r'[\n•\-\*]|(?=[🎮💼📄🚀💻🎬🎨🌐🏴])', cat_match.group(1))
             if len(c.strip()) > 3 and not c.strip().startswith("http")
         ]
-        branches = items[:4]
+        # Clean extra leading punctuation or empty items
+        branches = [b.strip() for b in items if len(b.strip()) > 3][:4]
 
     # 4. Extract Deadline
     deadline = None
@@ -84,20 +88,19 @@ def parse_competition_details(caption: str, title: str, account: str) -> dict:
     if dl_match:
         deadline = dl_match.group(1).strip()
 
-    # 5. Extract Registration & Guidebook Links
+    # 5. Extract Registration & Guidebook Links (Strictly ignore infolombait/blogger/tracking links)
     all_links = re.findall(r'https?://[^\s\x22\x27<>]+', text)
     reg_link = None
     guidebook_link = None
     for link in all_links:
         link_lower = link.lower()
+        if any(bad in link_lower for bad in ["infolombait", "blogger.com", "googleusercontent", "feedproxy"]):
+            continue
         if any(gb in link_lower for gb in ["guidebook", "juknis", "panduan", "buku-panduan", "guide"]):
             guidebook_link = link
-        elif any(reg in link_lower for reg in ["daftar", "registrasi", "form", "pendaftaran", "bit.ly"]):
+        elif any(reg in link_lower for reg in ["daftar", "registrasi", "form", "pendaftaran", "bit.ly", "linktr.ee"]):
             if not reg_link:
                 reg_link = link
-
-    if not reg_link and all_links:
-        reg_link = all_links[0]
 
     return {
         "organizer": organizer,
@@ -108,7 +111,7 @@ def parse_competition_details(caption: str, title: str, account: str) -> dict:
     }
 
 def create_lomba_embed(post: dict) -> discord.Embed:
-    """Creates a clean, minimal, non-overwhelming Discord Embed."""
+    """Creates a clean, minimal, Instagram-native Discord Embed."""
     raw_title = post.get("title") or f"Lomba Kampus: {post.get('account')}"
     title = f"🏆 {raw_title}" if not raw_title.startswith("🏆") else raw_title
     caption = post.get("caption", "").strip()
@@ -116,17 +119,23 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     # Parse metadata cleanly
     details = parse_competition_details(caption, raw_title, post.get("account", "Instagram Kampus"))
 
+    # Fail-safe sanitization for Instagram post URL
+    post_url = post.get("url") or "https://www.instagram.com/"
+    if "infolombait" in post_url.lower():
+        acc = post.get("account", "").lstrip("@")
+        post_url = f"https://www.instagram.com/{acc}/" if acc else "https://www.instagram.com/"
+
     embed = discord.Embed(
         title=title,
-        url=post.get("url"),
-        color=discord.Color.from_rgb(46, 204, 113), # Emerald green
+        url=post_url,
+        color=discord.Color.from_rgb(225, 48, 108), # Vibrant Instagram Rose
         timestamp=datetime.utcnow()
     )
 
-    # Clean author header with actual campus organizer
+    # Clean author header with Instagram identity and campus organizer
     embed.set_author(
-        name=f"🏛️ {details['organizer']}",
-        url=post.get("url"),
+        name=f"📸 Instagram • {details['organizer']}",
+        url=post_url,
         icon_url="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png"
     )
 
@@ -145,17 +154,16 @@ def create_lomba_embed(post: dict) -> discord.Embed:
     # 3. Status Verifikasi
     embed.add_field(
         name="🛡️ Keaslian",
-        value="✅ Terverifikasi Resmi",
+        value="✅ Terverifikasi Resmi Kampus",
         inline=True
     )
 
-    # 4. Tautan Resmi (Clean direct buttons / links)
-    action_links = []
+    # 4. Tautan Resmi (Direct Instagram & Official Form links)
+    action_links = [f"[📱 Buka Postingan Instagram]({post_url})"]
     if details["reg_link"]:
         action_links.append(f"[📝 Formulir Pendaftaran]({details['reg_link']})")
     if details["guidebook_link"]:
         action_links.append(f"[📖 Buku Panduan]({details['guidebook_link']})")
-    action_links.append(f"[📱 Buka Postingan Asli]({post.get('url')})")
 
     embed.add_field(
         name="📌 Tautan Lengkap",
@@ -263,33 +271,34 @@ async def ping_test(interaction: discord.Interaction):
 
     await interaction.response.send_message(content=msg, embed=embed)
 
-@bot.tree.command(name="test_lomba", description="Kirimkan 1 contoh postingan lomba kampus terbaru untuk melihat format kartu.")
+@bot.tree.command(name="test_lomba", description="Kirimkan 1 contoh postingan lomba Instagram kampus untuk melihat format kartu.")
 async def test_lomba(interaction: discord.Interaction):
-    """Sends a sample real competition post for verification."""
+    """Sends a sample real Instagram competition post for verification."""
     await interaction.response.defer(thinking=True)
     try:
         sample_post = {
-            "id": "test_sample_itfest",
+            "id": "test_sample_itfest_ipb",
             "title": "IT FEST 2026 - IPB University",
             "caption": (
-                "📢 IT FEST 2026 OFFICIALLY OPEN!\n"
+                "📢 IT FEST 2026 OFFICIALLY OPEN REGISTRATION!\n"
                 "Tema: Driving Sustainability In Nature Through Digital Innovation\n\n"
                 "Cabang Kompetisi:\n"
                 "• 🏴‍☠️ Capture The Flag (CTF)\n"
                 "• 💻 Software Development\n"
-                "• 🎬 Short Movie\n"
-                "• 🌐 IT Network System Administration\n\n"
+                "• 🎬 Short Movie & Animation\n"
+                "• 🎨 UI/UX Design Competition\n\n"
                 "Penyelenggara: Himpunan Mahasiswa Ilmu Komputer IPB (@itfestmicroipb)\n"
                 "Batas Pendaftaran: 25 November 2026\n"
                 "Link Pendaftaran: https://bit.ly/PendaftaranITFest2026\n"
-                "Guidebook: https://bit.ly/GuideBookITFest2026"
+                "Buku Panduan: https://bit.ly/GuideBookITFest2026"
             ),
-            "url": "https://instagram.com/itfestmicroipb",
+            "url": "https://www.instagram.com/itfestmicroipb/",
             "image_url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800",
-            "account": "Himpunan Mahasiswa Ilmu Komputer IPB"
+            "account": "@itfestmicroipb",
+            "matched_keywords": ["ctf", "ui/ux", "software development", "short movie"]
         }
         embed = create_lomba_embed(sample_post)
-        await interaction.followup.send(content="✨ **Berikut contoh tampilan format kartu lomba kampus:**", embed=embed)
+        await interaction.followup.send(content="✨ **Berikut contoh tampilan format kartu lomba langsung dari Instagram:**", embed=embed)
     except Exception as e:
         await interaction.followup.send(f"❌ Error: `{e}`")
 

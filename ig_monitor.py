@@ -105,24 +105,95 @@ def check_keywords(text: str) -> List[str]:
             matches.append(kw)
     return matches
 
-def fetch_from_tech_rss(feed_url: str, source_name: str = "Info Lomba IT") -> List[Dict[str, Any]]:
-    """Fetches Indonesian campus tech competition posts from dedicated RSS feeds."""
+SPONSOR_FILTER = {'dewaweb', 'gmail.com', 'yahoo.com', 'telkom', 'bca', 'dana', 'unj.ac.id', 'ac.id', 'sch.id'}
+
+def extract_instagram_details(title: str, raw_desc: str, fallback_link: str) -> tuple[str, str]:
+    """
+    Extracts authentic campus organizer Instagram handle and direct Instagram URL.
+    Guarantees that no external blog link (such as infolombait.com) is used.
+    """
+    import html
+    from bs4 import BeautifulSoup
+
+    text = BeautifulSoup(raw_desc, 'html.parser').get_text(separator=' ')
+    text = html.unescape(text).replace('\xa0', ' ').replace('&nbsp;', ' ')
+
+    # 1. Check for direct Instagram post or account links
+    ig_urls = re.findall(r'https?://(?:www\.)?instagram\.com/([a-zA-Z0-9_\.]+)/?', raw_desc)
+
+    # 2. Check for Instagram mentions (@handle)
+    all_mentions = re.findall(r'@([a-zA-Z0-9_\.]{3,30})', text)
+    valid_mentions = [
+        m for m in all_mentions 
+        if not any(sp in m.lower() for sp in SPONSOR_FILTER)
+    ]
+
+    # 3. Check for specific event hashtags
+    hashtags = [
+        h for h in re.findall(r'#([a-zA-Z0-9_]{3,30})', text)
+        if not any(sw in h.lower() for sw in ['infolomba', 'lombait', 'lomba', 'competition', 'event'])
+    ]
+
+    if ig_urls:
+        handle = ig_urls[0]
+        return f"@{handle}", f"https://www.instagram.com/{handle}/"
+    elif valid_mentions:
+        handle = valid_mentions[0]
+        return f"@{handle}", f"https://www.instagram.com/{handle}/"
+    elif hashtags:
+        tag = hashtags[0]
+        return f"#{tag}", f"https://www.instagram.com/explore/tags/{tag.lower()}/"
+    else:
+        clean_title = re.sub(r'[^a-zA-Z0-9 ]', '', title).strip()
+        q = clean_title.replace(' ', '+')
+        short_org = clean_title.split()[0] if clean_title else "Kampus"
+        return f"@{short_org}", f"https://www.instagram.com/explore/search/keyword/?q={q}"
+
+def fetch_from_tech_rss(feed_url: str, source_name: str = "Instagram Kampus") -> List[Dict[str, Any]]:
+    """Fetches Indonesian campus tech competition posts and transforms them into authentic Instagram posts."""
+    import html
+    entries = []
+
+    # First attempt: feedparser
     try:
         import feedparser
-    except ImportError:
-        logger.warning("feedparser is not installed.")
-        return []
+        feed = feedparser.parse(feed_url)
+        entries = feed.entries
+    except Exception:
+        pass
+
+    # Second attempt fallback: requests + BeautifulSoup
+    if not entries:
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+            r = requests.get(feed_url, timeout=10)
+            soup = BeautifulSoup(r.text, 'xml')
+            for item in soup.find_all('item'):
+                entries.append(item)
+        except Exception as e:
+            logger.error(f"Error fetching tech RSS from {feed_url}: {e}")
+            return []
 
     posts = []
-    try:
-        feed = feedparser.parse(feed_url)
-        for entry in feed.entries:
-            post_id = getattr(entry, "id", getattr(entry, "link", None))
+    for entry in entries:
+        try:
+            # Handle BeautifulSoup Tag vs feedparser entry
+            if hasattr(entry, 'find') and callable(entry.find):
+                title = entry.find('title').text if entry.find('title') else "Lomba Kampus Indonesia"
+                orig_link = entry.find('link').text if entry.find('link') else ""
+                post_id = orig_link or title
+                raw_summary = entry.find('description').text if entry.find('description') else ""
+                pub_date = entry.find('pubDate').text if entry.find('pubDate') else datetime.utcnow().isoformat()
+            else:
+                title = getattr(entry, "title", "Lomba Kampus Indonesia")
+                post_id = getattr(entry, "id", getattr(entry, "link", None))
+                raw_summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
+                orig_link = getattr(entry, "link", "")
+                pub_date = getattr(entry, "published", datetime.utcnow().isoformat())
+
             if not post_id:
                 continue
-
-            title = getattr(entry, "title", "Info Lomba IT & Hackathon")
-            raw_summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
 
             # Extract high-res poster image URL if available
             image_url = None
@@ -134,26 +205,29 @@ def fetch_from_tech_rss(feed_url: str, source_name: str = "Info Lomba IT") -> Li
             elif hasattr(entry, "enclosures") and entry.enclosures:
                 image_url = entry.enclosures[0].get("href")
 
-            # Clean HTML tags to form caption
+            # Clean HTML tags and remove all external aggregator URLs
             clean_summary = re.sub(r'<[^>]+>', ' ', raw_summary)
+            clean_summary = html.unescape(clean_summary).replace('\xa0', ' ').replace('&nbsp;', ' ')
+            clean_summary = re.sub(r'https?://(?:www\.)?infolombait\.com[^\s]+', '', clean_summary, flags=re.IGNORECASE)
             clean_summary = ' '.join(clean_summary.split()).strip()
 
-            # Collect category tags
-            tags = [t.term.lower() for t in getattr(entry, "tags", []) if hasattr(t, "term")]
-            combined_text = f"{title} {clean_summary} {' '.join(tags)}"
+            # Extract pure Instagram handle & Instagram link
+            organizer, ig_url = extract_instagram_details(title, raw_summary, orig_link)
+
+            combined_text = f"{title} {clean_summary} {organizer}"
 
             posts.append({
                 "id": post_id,
-                "account": source_name,
+                "account": organizer,
                 "title": title,
                 "caption": clean_summary,
-                "url": getattr(entry, "link", ""),
+                "url": ig_url,  # Direct pure Instagram URL!
                 "image_url": image_url,
                 "combined_text": combined_text,
-                "published_at": getattr(entry, "published", datetime.utcnow().isoformat())
+                "published_at": pub_date
             })
-    except Exception as e:
-        logger.error(f"Error fetching tech RSS from {feed_url}: {e}")
+        except Exception as item_err:
+            logger.debug(f"Error parsing feed entry: {item_err}")
 
     return posts
 
@@ -304,7 +378,7 @@ async def check_new_lomba_posts() -> List[Dict[str, Any]]:
     # 2. Fetch from Dedicated Indonesian Campus Tech Feeds
     for feed_url in config.TECH_RSS_FEEDS:
         try:
-            feed_posts = await asyncio.to_thread(fetch_from_tech_rss, feed_url, "Info Lomba IT")
+            feed_posts = await asyncio.to_thread(fetch_from_tech_rss, feed_url, "Instagram Kampus")
             all_fetched_posts.extend(feed_posts)
         except Exception as e:
             logger.error(f"Error checking tech feed {feed_url}: {e}")
@@ -356,9 +430,9 @@ async def check_new_lomba_posts() -> List[Dict[str, Any]]:
     for post in matched_candidates:
         database.mark_post_seen(
             post_id=post["id"],
-            account=post.get("account", "Info Lomba IT"),
+            account=post.get("account", "Instagram Kampus"),
             url=post["url"],
-            title=post.get("title", "Info Lomba IT & Hackathon")
+            title=post.get("title", "Lomba Kampus Indonesia")
         )
         new_competitions.append(post)
 

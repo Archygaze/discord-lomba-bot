@@ -4,7 +4,16 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass
+    # Robust fallback if python-dotenv is not installed
+    env_file = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(env_file):
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+
 
 def _get_int(key: str, default: int) -> int:
     val = os.getenv(key)
